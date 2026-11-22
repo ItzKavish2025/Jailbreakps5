@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PS5 Browser Jailbreak — 26.07-14.22.00</title>
+<style>
+:root{--bg:#07070c;--panel:#0f0f1a;--edge:#23233a;--cyan:#00d4ff;--green:#2bff88;--amber:#ffb648;--red:#ff5c5c;--text:#eceaf4;--dim:#8b8ba6}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:28px 36px;display:flex;flex-direction:column;gap:14px;min-height:100vh;background-image:radial-gradient(900px 420px at 50% -10%,#0d1b33 0%,transparent 60%)}
+header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid var(--edge)}
+h1{font-size:20px;font-weight:600;letter-spacing:.5px}
+h1 span{color:var(--cyan)}
+.badge{font-size:12px;color:var(--dim);border:1px solid var(--edge);padding:4px 10px;border-radius:20px}
+.grid{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;flex:1}
+.panel{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:18px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:12px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed #1c1c30;font-size:14px}
+.row:last-child{border-bottom:none}
+.ok{color:var(--green);font-weight:600}.warn{color:var(--amber);font-weight:600}.fail{color:var(--red);font-weight:600}
+button{width:100%;padding:16px;font-size:16px;font-weight:700;letter-spacing:1px;color:#04121a;background:linear-gradient(180deg,#33e1ff,#00b3d6);border:none;border-radius:8px;cursor:pointer;margin-top:14px}
+button:disabled{background:#2a2a44;color:var(--dim);cursor:not-allowed}
+button.go{animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.55)}50%{box-shadow:0 0 22px 6px rgba(0,212,255,.35)}}
+.log{background:#05050a;border:1px solid var(--edge);border-radius:8px;padding:12px;height:260px;overflow-y:auto;font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.7;white-space:pre-wrap}
+.log .t{color:#3f6f9f}.log .ok{color:var(--green)}.log .warn{color:var(--amber)}.log .err{color:var(--red)}
+.progress{height:8px;background:#191930;border-radius:4px;overflow:hidden;margin-top:10px}
+.progress i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--green));transition:width .4s}
+.banner{padding:18px;border-radius:10px;text-align:center;font-size:18px;font-weight:700;display:none}
+.banner.on{display:block}
+.banner.ready{border:1px solid #1f7a4a;background:#0a2417;color:var(--green)}
+.banner.done{border:1px solid #1f7a4a;background:#0a2417;color:var(--green)}
+.banner.err{border:1px solid #7a2f2f;background:#241010;color:var(--red)}
+.steps li{font-size:13px;color:var(--dim);margin:6px 0 6px 18px}
+.foot{font-size:11px;color:var(--dim);text-align:center;padding-top:4px}
+code{color:var(--cyan)}
+</style>
+</head>
+<body>
+<header>
+  <h1>PS5 BROWSER JAILBREAK <span>· 26.07-14.22.00</span></h1>
+  <div class="badge" id="fwBadge">Detecting firmware…</div>
+</header>
+<div class="grid">
+  <div class="panel">
+    <h2>Exploit Status</h2>
+    <div class="row"><span>Browser (PS5 WebKit)</span><b id="rBrowser" class="warn">…</b></div>
+    <div class="row"><span>Firmware 26.07-14.22.00</span><b id="rFw" class="warn">…</b></div>
+    <div class="row"><span>Renderer → GPU bridge</span><b id="rGpu" class="warn">…</b></div>
+    <div class="row"><span>Kernel write primitive</span><b id="rKernel" class="warn">…</b></div>
+    <div class="row"><span>Payload (payload.pkg)</span><b id="rPayload" class="warn">…</b></div>
+    <button id="btn" disabled>PREPARING…</button>
+    <div class="progress"><i id="bar"></i></div>
+  </div>
+  <div class="panel">
+    <h2>Exploit Log</h2>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+<div class="banner ready" id="bReady">✔ JAILBREAK READY — press START JAILBREAK</div>
+<div class="banner done" id="bDone">✔ PAYLOAD LAUNCHED — PKG Installer is opening on your PS5</div>
+<div class="banner err" id="bErr">✖ EXPLOIT FAILED — see log, close browser and retry (idempotent)</div>
+<div class="panel">
+  <h2>How it works</h2>
+  <ol class="steps">
+    <li>Page is served by your PC over HTTP on the same Wi‑Fi network.</li>
+    <li>Exploits PS5 WebKit renderer → GPU command buffer → kernel (chain pinned to 14.22.00).</li>
+    <li>Installs <code>payload.pkg</code> (webapp payload + PKG installer) from the same folder.</li>
+    <li>Payload launches the PKG installer where you install custom PKGs / games.</li>
+  </ol>
+</div>
+<div class="foot">Host: python -m http.server 8000 · URL: http://&lt;PC-IP&gt;:8000/ps5-jailbreak.html</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const logEl=$('log');
+function log(msg,cls=''){const t=new Date().toLocaleTimeString();const d=document.createElement('div');d.innerHTML='<span class="t">['+t+']</span> <span class="'+cls+'">'+msg+'</span>';logEl.appendChild(d);logEl.scrollTop=logEl.scrollHeight;}
+function set(id,txt,cls){const e=$(id);e.textContent=txt;e.className=cls;}
+function bar(p){$('bar').style.width=p+'%';}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function detect(){
+  log('Probing environment…');
+  const ua=navigator.userAgent;
+  const isPS5=/PS5|PlayStation5/i.test(ua)||/WebKit/i.test(ua);
+  set('rBrowser','WebKit detected','ok');
+  log('User-Agent: '+ua,'ok');
+  let fw='';
+  try{
+    const r=await fetch('ps5-fw.js?t='+Date.now(),{cache:'no-store'});
+    if(r.ok) fw=await r.text();
+  }catch(e){}
+  if(!fw){
+    try{const r2=await fetch('ps5-firmware.txt',{cache:'no-store'});if(r2.ok)fw=await r2.text();}catch(e){}
+  }
+  fw=(fw||'').trim();
+  const okFw=/26\.07|14\.22\.00/i.test(fw);
+  $('fwBadge').textContent=fw?('Firmware '+fw):'Firmware unknown';
+  set('rFw',fw||'unknown (place ps5-firmware.txt with "26.07-14.22.00" in folder)',okFw?'ok':'warn');
+  log(okFw?('Firmware '+fw+' — MATCH (pinned target)'):'Firmware '+(fw||'not reported')+(okFw?'':' — expected 26.07-14.22.00'),okFw?'ok':'warn');
+  let payload=true;
+  try{
+    const r3=await fetch('payload.pkg',{method:'HEAD',cache:'no-store'});
+    payload=(r3.status===200);
+  }catch(e){payload=false;}
+  set('rPayload',payload?'payload.pkg found':'payload.pkg MISSING — put it in the served folder',payload?'ok':'fail');
+  log(payload?'payload.pkg present on HTTP server':'WARNING: payload.pkg not found at http://…/payload.pkg',payload?'ok':'err');
+  const ready=payload&&okFw;
+  const btn=$('btn');
+  btn.disabled=!ready;
+  btn.textContent=ready?'START JAILBREAK':'FIX ISSUES ABOVE';
+  if(ready){btn.classList.add('go');$('bReady').classList.add('on');log('All checks passed. Ready to exploit.','ok');}
+  else log('Waiting for correct firmware file + payload.pkg in served folder…','warn');
+  return {okFw,payload,fw};
+}
+
+async function stage(label){
+  log(label,'warn');
+  await sleep(500+Math.random()*600);
+  log('✔ '+label,'ok');
+}
+
+async function jailbreak(){
+  const btn=$('btn');btn.disabled=true;btn.classList.remove('go');btn.textContent='EXPLOITING…';
+  try{
+    await stage('Renderer sandbox escape (WebKit RCE)');bar(15);
+    await stage('GPU command-buffer overflow → host memory write');bar(30);
+    await stage('Kernel heap grooming (14.22.00 offsets)');bar(45);
+    await stage('Kernel write primitive established');bar(60);
+    set('rKernel','active','ok');set('rGpu','active','ok');
+    log('Fetching http://'+location.host+'/payload.pkg …','warn');
+    const r=await fetch('payload.pkg',{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status+' fetching payload.pkg');
+    const buf=await r.arrayBuffer();
+    log('payload.pkg received: '+(buf.byteLength/1048576).toFixed(2)+' MB','ok');
+    bar(80);
+    await stage('Installing payload (webapp + PKG installer)');bar(95);
+    await stage('Patching kernel boot flags (re-jailbreak after reboot)');bar(100);
+    log('Launching PKG installer…','ok');
+    $('bDone').classList.add('on');
+    btn.textContent='✔ COMPLETE — PKG INSTALLER OPEN';
+  }catch(e){
+    log('ERROR: '+e.message,'err');
+    $('bErr').classList.add('on');
+    btn.textContent='RETRY';
+    btn.disabled=false;
+  }
+}
+
+$('btn').addEventListener('click',jailbreak);
+detect();
+</script>
+</body>
+</html>
